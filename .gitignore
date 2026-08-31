@@ -216,5 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Misc
 /.claude/
 /.idea/
+.pi/
+CLAUDE.md
+pr_description.md
+test.md

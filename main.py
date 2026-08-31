@@ -17,6 +17,10 @@ Your job is to:
 If there are no grammar or spelling errors, return the original content unchanged and an empty summary list.
 """
 
+append_prompt = os.environ.get("SYSTEM_PROMPT_APPEND", "").strip()
+if append_prompt:
+    system_prompt = system_prompt.rstrip() + "\n\n" + append_prompt
+
 
 def parse_globs() -> list[str]:
     raw = os.environ["FILE_EXTENSIONS"]
@@ -75,7 +79,7 @@ def main():
     summary: list[str] = []
     for filename, body in files.items():
         result = check_file(provider, filename, body, model_tier, max_output_tokens)
-        if not result.summary and result.corrected_content == body:
+        if not result.fixes_needed:
             continue
         corrected_files[filename] = result.corrected_content
         summary.extend(f"`{filename}`: {point}" for point in result.summary)

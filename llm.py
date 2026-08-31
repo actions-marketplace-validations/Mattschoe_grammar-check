@@ -13,9 +13,12 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from openai.types.shared_params import ResponseFormatJSONObject
+from pydantic import SecretStr
+
 
 @dataclass
 class FileResponse:
+    fixes_needed: bool
     corrected_content: str
     summary: list[str]
 
@@ -27,10 +30,21 @@ class ModelTier(Enum):
 _TOOL_SCHEMA = {
     "type": "object",
     "properties": {
-        "corrected_content": {"type": "string"},
-        "summary": {"type": "array", "items": {"type": "string"}}
+        "fixes_needed": {
+            "type": "boolean",
+            "description": "Set to false if the text has no grammar or spelling errors. Set to true if fixes were made."
+        },
+        "corrected_content": {
+            "type": "string",
+            "description": "The fully corrected text. Only provide if fixes_needed is true."
+        },
+        "summary": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of changes made. Only provide if fixes_needed is true."
+        }
     },
-    "required": ["corrected_content", "summary"]
+    "required": ["fixes_needed"]
 }
 
 def _user_message(filename: str, file_content: str) -> str:
@@ -42,8 +56,8 @@ def call_claude(filename: str, file_content: str, system_prompt: str, model_tier
         "description": "Submit the grammar fixes and summary",
         "input_schema": _TOOL_SCHEMA
     }]
-    api_key = os.environ["LLM_API_KEY"]
-    client = anthropic.Anthropic(api_key=api_key)
+    api_key = SecretStr(os.environ["LLM_API_KEY"])
+    client = anthropic.Anthropic(api_key=api_key.get_secret_value())
 
     match model_tier:
         case ModelTier.CHEAP:
@@ -70,17 +84,18 @@ def call_claude(filename: str, file_content: str, system_prompt: str, model_tier
 
     result = response.content[0].input
     return FileResponse(
-        corrected_content=cast(str, result["corrected_content"]),
-        summary=cast(list[str], result["summary"])
+        fixes_needed=cast(bool, result.get("fixes_needed", False)),
+        corrected_content=cast(str, result.get("corrected_content")),
+        summary=cast(list[str], result.get("summary"))
     )
 
 def call_deepseek(filename: str, file_content: str, system_prompt: str, model_tier: ModelTier, max_output_tokens: int) -> FileResponse:
-    api_key = os.environ["LLM_API_KEY"]
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    api_key = SecretStr(os.environ["LLM_API_KEY"])
+    client = OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.deepseek.com")
 
     _JSON_SCHEMA_PROMPT = (
         '\n\nRespond with a JSON object matching this schema exactly:\n'
-        '{"corrected_content": "<corrected file content>", "summary": ["<change 1>", ...]}'
+        '{"fixes_needed": true/false, "corrected_content": "<corrected file content, optional>", "summary": ["<change 1>", ... optional]}'
     )
 
     match model_tier:
@@ -141,6 +156,7 @@ def call_deepseek(filename: str, file_content: str, system_prompt: str, model_ti
         result = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
 
     return FileResponse(
-        corrected_content=cast(str, result["corrected_content"]),
-        summary=cast(list[str], result["summary"])
+        fixes_needed=cast(bool, result.get("fixes_needed", False)),
+        corrected_content=cast(str | None, result.get("corrected_content")),
+        summary=cast(list[str] | None, result.get("summary"))
     )

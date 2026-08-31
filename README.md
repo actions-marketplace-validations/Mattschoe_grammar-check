@@ -48,7 +48,18 @@ if nothing needed fixing, the action is a no-op.
 | `api-key`           | yes      | —        | API key for the chosen provider.                              |
 | `file-extensions`   | yes      | —        | Comma-separated extensions to check, no dots (e.g. `tex,md`). |
 | `tier`              | no       | `medium` | Model size: `cheap`, `medium`, or `expensive`.                |
-| `max-output-tokens` | no       | `16384`  | Max output tokens per file. Raise for long documents.         |
+| `max-output-tokens`    | no       | `16384`  | Max output tokens per file. Raise for long documents.         |
+| `system-prompt-append` | no       | —        | Extra instructions appended to the LLM system prompt.         |
+| `commit-message`    | no       | `fix: grammar and spelling fixes` | Commit message + PR title for the grammar-fix PR. Free-form; any message accepted. |
+
+Example with extra instructions:
+
+```yaml
+with:
+  system-prompt-append: |
+    Avoid em-dashes — use commas or parentheses instead.
+    Ensure the tone is formal academic English.
+```
 
 ## Supported Providers & Tiers
 
